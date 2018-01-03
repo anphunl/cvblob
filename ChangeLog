@@ -1,10 +1,3 @@
-Version 0.20.0 (2013/07/20)
-
-  * Rewrote the library to use the OpenCV C++ interface
-  * Breaking changes: will require a C++11-compliant compiler
-  * Added a simpler, more efficient labelling algorithm, does not compute contours
-  * (Temporarily) removed tracking support
-
 Version 0.10.4 (2011/01/26)
 
   * CMakeLists.txt, cvBlobConfig.cmake.in: created "cvBlobConfig.cmake" for
