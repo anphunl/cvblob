@@ -36,11 +36,7 @@
 #include <vector>
 #include <limits>
 
-#if (defined(_WIN32) || defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__) || (defined(__APPLE__) & defined(__MACH__)))
-#include <cv.h>
-#else
-#include <opencv/cv.h>
-#endif
+#include <opencv2/opencv.hpp>
 
 #ifndef __CV_BEGIN__
 #define __CV_BEGIN__ __BEGIN__
@@ -81,7 +77,7 @@ extern "C" {
   /// \see CV_CHAINCODE_DOWN_RIGHT
   /// \see CV_CHAINCODE_RIGHT
   /// \see CV_CHAINCODE_UP_RIGHT
-  const char cvChainCodeMoves[8][2] = { { 0, -1},
+  const int cvChainCodeMoves[8][2] = { { 0, -1},
                                         { 1, -1},
 					{ 1,  0},
 					{ 1,  1},
