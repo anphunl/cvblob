@@ -69,16 +69,56 @@ cvb::CvContoursChainCode* list2CvContoursChainCode(bp::list l) {
 }
 
 class BlobTracker {
+    private:
+    cvb::CvBlobs blobs;
+    cvb::CvTracks tracks;
+
     public:
-    bp::object process(const bp::object &img_mask) {
-        return bp::object(bp::handle<>(pbcvt::fromMatToNDArray(pbcvt::fromNDArrayToMat(img_mask.ptr()))));
+    void process(const bp::object &img_mask) {
+        IplImage* segmentated = new IplImage(pbcvt::fromNDArrayToMat(img_mask.ptr()));
+  
+        IplConvKernel* morphKernel = cvCreateStructuringElementEx(5, 5, 1, 1, CV_SHAPE_RECT, NULL);
+        cvMorphologyEx(segmentated, segmentated, NULL, morphKernel, CV_MOP_OPEN, 1);
+
+        IplImage* labelImg = cvCreateImage(cvGetSize(segmentated), IPL_DEPTH_LABEL, 1);
+
+        cvReleaseBlobs(blobs);
+        blobs = cvb::CvBlobs();
+        unsigned int result = cvb::cvLabel(segmentated, labelImg, blobs);
+
+        cvb::cvUpdateTracks(blobs, tracks, 200., 5);
+
+        cvReleaseImage(&labelImg);
+        delete segmentated;
+        cvReleaseStructuringElement(&morphKernel);
     }
+
+    bp::object getBlobs() {
+        //return blobs;
+        return bp::object();
+    }
+
+    bp::dict getTracks() {
+        bp::dict py_tracks;
+
+        cvb::CvTracks::iterator it;
+
+        for ( it = tracks.begin(); it != tracks.end(); it++ )
+        {
+            bp::object py_track((Track *)it->second);
+            py_tracks[it->first] = py_track;
+        }
+
+        return py_tracks;
+    };
 };
 
 //boost block -- here's where we reveal everything to Python
 BOOST_PYTHON_MODULE(_cvblob) {
     class_<BlobTracker> ("BlobTracker")
-        .def("process", &BlobTracker::process);
+        .def("process", &BlobTracker::process)
+        .def("getBlobs", &BlobTracker::getBlobs)
+        .def("getTracks", &BlobTracker::getTracks);
 
 
   class_<ContourChainCode> ("ContourChainCode")
