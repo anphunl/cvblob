@@ -6,6 +6,7 @@
 
 namespace bp = boost::python;
 using namespace bp;
+using namespace std;
 
 struct Blob : cvb::CvBlob { };
 struct Track : cvb::CvTrack { };
@@ -17,6 +18,13 @@ struct Track : cvb::CvTrack { };
 //simple casting to our wrapped structs
 #define object2CvBlob(a) (cvb::CvBlob*)bp::extract<Blob*>(a)
 #define object2CvTrack(a) (cvb::CvTrack*)bp::extract<Track*>(a)
+
+struct CvLocation {
+    bool isActive;
+    std::list<CvPoint2D64f> locationsHistory;
+};
+
+typedef std::map<cvb::CvID, CvLocation *> CvLocations;
 
 cvb::CvChainCodes* list2CvChainCodes(bp::list l) {
   cvb::CvChainCodes *cc = new cvb::CvChainCodes();
@@ -70,32 +78,88 @@ cvb::CvContoursChainCode* list2CvContoursChainCode(bp::list l) {
 
 class BlobTracker {
     private:
-    cvb::CvBlobs blobs;
     cvb::CvTracks tracks;
+    CvLocations locations;
+
+    void renderLocation(IplImage* frame) {
+        for (CvLocations::iterator it = locations.begin(); it != locations.end(); it++) {
+            
+            CvLocation * location = it->second;
+            if (location->isActive) {
+                for (std::list<CvPoint2D64f>::iterator it = location->locationsHistory.begin(); it != location->locationsHistory.end(); ++it){
+                    cvCircle(frame, cv::Point(it->x, it->y), 3, cv::Scalar(255,255,255), -1);
+                }
+            }
+        }
+    }
+
+    void updateLocation() {
+        for (cvb::CvTracks::iterator it = tracks.begin(); it != tracks.end(); it++ )
+        {
+            cvb::CvID key = it->first;
+            cvb::CvTrack *track = it->second;
+
+            CvLocations::iterator search = locations.find(key);
+            
+            if (search != locations.end()) {
+                search->second->isActive = (track->active >= 0 && track->inactive == 0);
+                search->second->locationsHistory.push_back(track->centroid);
+            } else {
+                CvLocation *location = new CvLocation();
+                
+                location->isActive = (track->active >= 0 && track->inactive == 0);
+                location->locationsHistory.push_back(track->centroid);
+
+                locations.insert(std::pair<cvb::CvID, CvLocation *>(key,location));
+            }
+        }
+
+        for (CvLocations::iterator it = locations.begin(); it != locations.end(); it++) {
+            cvb::CvTracks::iterator search = tracks.find(it->first);
+
+            if (search == tracks.end()) {
+                // delete search->second;
+                locations.erase(it);
+            }
+        }
+    }
 
     public:
-    void process(const bp::object &img_mask) {
+    double thDistance;
+    int thInactive;
+    int minArea;
+
+    BlobTracker() {
+        thDistance = 50.0;
+        thInactive = 5;
+        minArea = 10;
+    }
+
+    void process(const bp::object &img_mask, const bp::object &img) {
         IplImage* segmentated = new IplImage(pbcvt::fromNDArrayToMat(img_mask.ptr()));
+        IplImage* frame = new IplImage(pbcvt::fromNDArrayToMat(img.ptr()));
   
         IplConvKernel* morphKernel = cvCreateStructuringElementEx(5, 5, 1, 1, CV_SHAPE_RECT, NULL);
         cvMorphologyEx(segmentated, segmentated, NULL, morphKernel, CV_MOP_OPEN, 1);
 
         IplImage* labelImg = cvCreateImage(cvGetSize(segmentated), IPL_DEPTH_LABEL, 1);
 
-        cvReleaseBlobs(blobs);
-        blobs = cvb::CvBlobs();
+        cvb::CvBlobs blobs;
         unsigned int result = cvb::cvLabel(segmentated, labelImg, blobs);
 
-        cvb::cvUpdateTracks(blobs, tracks, 200., 5);
+        cvb::cvFilterByArea(blobs, minArea, 1000000);
+
+        cvb::cvUpdateTracks(blobs, tracks, thDistance, thInactive);
+        updateLocation();
+        renderLocation(frame);
+
+        cvb::cvRenderTracks(tracks, frame, frame, CV_TRACK_RENDER_ID);
 
         cvReleaseImage(&labelImg);
+        cvReleaseBlobs(blobs);
         delete segmentated;
+        delete frame;
         cvReleaseStructuringElement(&morphKernel);
-    }
-
-    bp::object getBlobs() {
-        //return blobs;
-        return bp::object();
     }
 
     bp::dict getTracks() {
@@ -117,8 +181,10 @@ class BlobTracker {
 BOOST_PYTHON_MODULE(_cvblob) {
     class_<BlobTracker> ("BlobTracker")
         .def("process", &BlobTracker::process)
-        .def("getBlobs", &BlobTracker::getBlobs)
-        .def("getTracks", &BlobTracker::getTracks);
+        .def("getTracks", &BlobTracker::getTracks)
+        .def_readwrite("thDistance", &BlobTracker::thDistance)
+        .def_readwrite("thInactive", &BlobTracker::thInactive)
+        .def_readwrite("minArea", &BlobTracker::minArea);
 
 
   class_<ContourChainCode> ("ContourChainCode")

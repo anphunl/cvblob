@@ -10,6 +10,7 @@
 #
 
 import cv2
+import pyboostcvconverter as pbcvt
 from _cvblob import *
 
 #chaincode constants
@@ -69,21 +70,21 @@ ContourPolygon = types.ListType
 
 #this is some weird creepy magic in boost::python, but i had no ability
 #to export a function named "Label" (expect it collided with some keyword)
-def Label(img, imgOut, blobs):
-  return _cvblob.LabelBlobs(img, imgOut, blobs)
+# def Label(img, imgOut, blobs):
+#   return _cvblob.LabelBlobs(img, imgOut, blobs)
 
-#these were just a little too painful to wrapper for what they actually do
-#compared to just implementing it in python.  Might bite you if you have
-#1000s of blobs, and allows for sloppy memory mgmt 
-def FilterByArea(blobs, minArea, maxArea):
-  for i in blobs.keys():
-    if (blobs[i].area < minArea or blobs[i].area > maxArea):
-      del blobs[i];
+# #these were just a little too painful to wrapper for what they actually do
+# #compared to just implementing it in python.  Might bite you if you have
+# #1000s of blobs, and allows for sloppy memory mgmt 
+# def FilterByArea(blobs, minArea, maxArea):
+#   for i in blobs.keys():
+#     if (blobs[i].area < minArea or blobs[i].area > maxArea):
+#       del blobs[i];
 
-def FilterByLabel(blobs, label):
-  for i in blobs.keys():
-    if (blobs[i].label != label):
-      del blobs[i];
+# def FilterByLabel(blobs, label):
+#   for i in blobs.keys():
+#     if (blobs[i].label != label):
+#       del blobs[i];
 
-def SetImageROItoBlob(img, blob):
-  cv.SetImageROI(img, (blob.minx, blob.miny, blob.maxx - blob.minx, blob.maxy - blob.miny))
+# def SetImageROItoBlob(img, blob):
+#   cv.SetImageROI(img, (blob.minx, blob.miny, blob.maxx - blob.minx, blob.maxy - blob.miny))
